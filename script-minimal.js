@@ -159,6 +159,7 @@ const previewPages = {
   visual: [45, 48, 50], workflow: [56, 59, 61],
 };
 const portfolioPageSrc = (page) => `./assets/portfolio/hd/page-${String(page).padStart(2, '0')}${page === 61 ? '-revised' : ''}.jpg`;
+const portfolioPreviewSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/previews/');
 const previewPositions = new Map();
 
 if (!reducedMotion.matches) {
@@ -448,7 +449,7 @@ window.setInterval(async () => {
   const label = index.querySelector('.project-preview-caption');
   const project = projects.filter(item => item.category === id)[next];
   const nextImage = new Image();
-  nextImage.src = portfolioPageSrc(pages[next]);
+  nextImage.src = portfolioPreviewSrc(pages[next]);
   try { await nextImage.decode(); } catch { return; }
   if (currentView !== 'work' || !entry.classList.contains('is-current') || index.matches(':hover, :focus-within')) return;
   const exit = img.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
