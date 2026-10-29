@@ -20,8 +20,10 @@
 - `index.html`：当前正式页面；`minimal.html` 为保留旧链接的入口。
 - `styles-minimal.css`、`script-minimal.js`、`water-flow.js`：样式、交互与背景。
 - `assets/portfolio/`：实际引用的作品高清图片、头像和四个插画。
-- 公网版使用阿里巴巴普惠体 2.0。`portfolio-font.css` 引用阿里官方托管的网页字体文件；仓库不分发字体文件。官网字体服务无法访问时回退到系统黑体。
-- `assets/fonts/` 被 Git 忽略，不会上传本地汉仪字体。
+- 中文使用阿里巴巴普惠体 2.0，`portfolio-font.css` 引用 `assets/fonts/` 内的网页字体。
+- 两个封面与四个部分的英文标题统一使用随站发布的 Poppins Black；许可见 `assets/fonts/Poppins-OFL.txt`。
+- `assets/fonts/` 只允许提交普惠体网页字体、Poppins Black 及其许可证，不会上传本地汉仪字体。
+- `preview/mobile.html`：390px 手机尺寸预览，可在电脑中独立查看。
 - 原工作目录中的文件未修改。后续更新时请同步发布目录，再推送到 GitHub。
 
 作品图片和个人内容未授予开源许可。普惠体来源：`https://fonts.alibabagroup.com/`，字体文件由 `fonts.alibabadesign.com` 提供。

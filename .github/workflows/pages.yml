@@ -31,6 +31,7 @@ jobs:
           mkdir _site
           cp index.html minimal.html 404.html styles-minimal.css portfolio-font.css script-minimal.js water-flow.js favicon.svg .nojekyll _site/
           cp -R assets _site/assets
+          cp -R preview _site/preview
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

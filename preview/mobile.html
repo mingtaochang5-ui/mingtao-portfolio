@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>常明涛 — 手机版预览</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #161818; }
+      body { display: grid; justify-items: center; gap: 16px; padding: 24px 0; font: 13px/1.5 system-ui, sans-serif; color: #eeeeeb; }
+      nav { display: flex; justify-content: space-between; gap: 24px; width: min(390px, 100%); padding-inline: 14px; }
+      a { color: #a3b8ff; text-underline-offset: 4px; }
+      iframe { display: block; width: min(390px, 100%); height: 844px; border: 0; border-radius: 18px; background: #252626; box-shadow: 0 0 0 1px #ffffff18; }
+      @media (max-width: 420px) {
+        body { padding: 0; gap: 0; }
+        nav { padding-block: 10px; }
+        iframe { width: 100%; height: calc(100svh - 40px); border-radius: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="预览导航"><span>手机版预览 · 390px</span><a href="../index.html#about" target="_blank" rel="noopener">打开完整网站</a></nav>
+    <iframe src="../index.html?preview=mobile&amp;v=unified-display#about" title="常明涛作品集手机版"></iframe>
+  </body>
+</html>

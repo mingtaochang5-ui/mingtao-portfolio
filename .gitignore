@@ -5,3 +5,5 @@ node_modules/
 *.log
 assets/fonts/*
 !assets/fonts/AlibabaPuHuiTi-2-*.woff2
+!assets/fonts/Poppins-Black.ttf
+!assets/fonts/Poppins-OFL.txt
