@@ -287,7 +287,9 @@ body:not(.menu-open) main, body:not(.menu-open) .site-footer { transition: filte
   .project-index:is(:hover, :focus-within) .project-index-list { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; transition-delay: 0s; }
 }
 @media (hover: none) {
-  .project-preview { display: none; }
+  /* Touch screens cannot reveal a hidden preview by hovering. */
+  .project-preview { position: static; display: block; flex-shrink: 0; margin-bottom: 18px; transform: none; }
+  .project-preview-hint { display: none; }
 }
 .project-index-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #b9bfbd; color: #656c6a; font-size: 11px; font-weight: 450; line-height: 1.5; }
 .project-index-label > span:first-child { display: grid; gap: 5px; min-width: 0; }
@@ -453,7 +455,7 @@ body.detail-open { overflow: hidden; }
   .archive-foot { font-size: 9px; }
   .archive-foot a { gap: 8px; font-size: 9px; white-space: nowrap; }
   .work-list { padding-top: 0; }
-  .work-entry { position: relative; top: auto; grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr)); grid-template-rows: minmax(210px, 40svh) 1fr; gap: 12px; height: calc(100svh - var(--header-height)); min-height: calc(100svh - var(--header-height)); margin: 0; padding: 10px 0; }
+  .work-entry { position: relative; top: auto; grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr)); grid-template-rows: minmax(210px, 40svh) 1fr; gap: 12px; height: auto; min-height: calc(100svh - var(--header-height)); margin: 0; padding: 10px 0; }
   .work-entry:nth-child(n) { --card-inset: 18px; --stack-depth: 0px; clip-path: none; }
   .work-entry.is-stacked .card-number,
   .work-entry.is-stacked .card-cover-content,
@@ -476,7 +478,9 @@ body.detail-open { overflow: hidden; }
   .card-arrow { bottom: 13px; left: auto; right: 13px; width: 24px; height: 24px; font-size: 14px; }
   .entry-caption { display: none; }
   .project-index { margin-bottom: 0; padding: 4px var(--card-inset) 10px; }
-  .project-preview { display: none; }
+  .project-index .project-preview,
+  .project-index:is(:hover, :focus-within) .project-preview { position: static; display: block; flex-shrink: 0; margin-bottom: 18px; opacity: 1; visibility: visible; transform: none; }
+  .project-preview-hint { display: none; }
   .project-index-label, .project-index-list { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
   .card-hint { left: 18px; bottom: 13px; font-size: 9px; }
   .project-index-label { align-items: flex-start; }
