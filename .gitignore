@@ -3,4 +3,5 @@
 .env.*
 node_modules/
 *.log
-assets/fonts/
+assets/fonts/*
+!assets/fonts/AlibabaPuHuiTi-2-*.woff2
