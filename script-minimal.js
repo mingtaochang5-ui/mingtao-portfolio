@@ -160,6 +160,9 @@ const previewPages = {
 };
 const portfolioPageSrc = (page) => `./assets/portfolio/hd/page-${String(page).padStart(2, '0')}${page === 61 ? '-revised' : ''}.jpg`;
 const portfolioPreviewSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/previews/');
+const portfolioDetailSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/screen/').replace('.jpg', '.webp');
+const portfolioQuickSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/quick/');
+let detailImageObserver;
 const previewPositions = new Map();
 
 if (!reducedMotion.matches) {
@@ -512,7 +515,56 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+function prepareDetailImage(img, page) {
+  const figure = img.closest('.detail-figure');
+  const status = element('span', 'detail-image-status', '图片加载中…');
+  status.setAttribute('role', 'status');
+  img.after(status);
+  let timer = 0;
+  let stage = 0;
+  const sources = [portfolioDetailSrc(page), portfolioQuickSrc(page)];
+  const load = () => {
+    if (!img.isConnected) return;
+    window.clearTimeout(timer);
+    figure.classList.remove('image-unavailable');
+    figure.classList.add('image-loading');
+    status.textContent = '图片加载中…';
+    img.src = sources[stage];
+    timer = window.setTimeout(fallback, 8000);
+  };
+  const fallback = () => {
+    window.clearTimeout(timer);
+    if (!img.isConnected || (img.complete && img.naturalWidth)) return;
+    if (stage === 0) {
+      stage = 1;
+      load();
+    } else {
+      figure.classList.remove('image-loading');
+      figure.classList.add('image-unavailable');
+      status.textContent = '加载较慢，点击重试';
+    }
+  };
+  img.addEventListener('load', () => {
+    window.clearTimeout(timer);
+    figure.classList.remove('image-loading', 'image-unavailable');
+    status.textContent = '';
+  });
+  img.addEventListener('error', fallback);
+  return () => {
+    stage = 0;
+    load();
+  };
+}
+
 function renderDetail(index, project = null) {
+  detailImageObserver?.disconnect();
+  detailImageObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(({ target, isIntersecting }) => {
+      if (!isIntersecting) return;
+      target.loadImage();
+      observer.unobserve(target);
+    });
+  }, { root: dialog, rootMargin: '100% 0px' });
   detailCategory = index;
   detailProject = project;
   const category = categories[index];
@@ -546,11 +598,11 @@ function renderDetail(index, project = null) {
     button.type = 'button';
     button.setAttribute('aria-label', `放大查看：${caption}`);
     const img = element('img');
-    img.src = portfolioPageSrc(page);
     img.alt = caption;
     img.width = 2400;
     img.height = [28, 44, 55].includes(page) ? 500 : 1350;
-    img.loading = order < 2 ? 'eager' : 'lazy';
+    // The dialog owns scrolling; do not depend on native lazy loading in a hidden dialog.
+    img.loading = 'eager';
     img.decoding = 'async';
     button.append(img, element('span', 'image-zoom-hint', '放大'));
     button.addEventListener('click', () => {
@@ -558,7 +610,7 @@ function renderDetail(index, project = null) {
         retryImage();
         return;
       }
-      expandedImage.src = img.src;
+      expandedImage.src = portfolioPageSrc(page);
       expandedImage.alt = caption;
       imageCaption.textContent = caption;
       imageDialog.showModal();
@@ -567,7 +619,10 @@ function renderDetail(index, project = null) {
     figcaption.append(element('span', '', `${String(order + 1).padStart(2, '0')} / ${caption}`), element('span', '', `PDF ${String(page).padStart(2, '0')}`));
     figure.append(button, figcaption);
     detailGallery.append(figure);
-    const retryImage = watchImage(img);
+    const retryImage = prepareDetailImage(img, page);
+    img.loadImage = retryImage;
+    if (order === 0) retryImage();
+    else detailImageObserver.observe(img);
   });
   const isLastDetail = project ? project === projects.at(-1) : index === categories.length - 1;
   document.querySelector('.detail-next-label').textContent = isLastDetail ? '返回设计流程封面' : project ? '下一个项目' : '下一板块';
