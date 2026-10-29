@@ -159,11 +159,43 @@ const previewPages = {
   visual: [45, 48, 50], workflow: [56, 59, 61],
 };
 const portfolioPageSrc = (page) => `./assets/portfolio/hd/page-${String(page).padStart(2, '0')}${page === 61 ? '-revised' : ''}.jpg`;
-const portfolioPreviewSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/previews/');
+const portfolioPreviewSrc = (page) => portfolioQuickSrc(page);
 const portfolioDetailSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/screen/').replace('.jpg', '.webp');
 const portfolioQuickSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/quick/');
 let detailImageObserver;
+let expandedImageRequest = 0;
 const previewPositions = new Map();
+
+// Share completed downloads between prefetch, detail views and repeat visits.
+const portfolioImageRequests = new Map();
+function loadPortfolioImage(src, priority = 'low') {
+  src = new URL(src, document.baseURI).href;
+  if (portfolioImageRequests.has(src)) return portfolioImageRequests.get(src);
+  const image = new Image();
+  image.decoding = 'async';
+  image.fetchPriority = priority;
+  const request = new Promise((resolve, reject) => {
+    image.onload = () => resolve({ src: image.src });
+    image.onerror = () => {
+      portfolioImageRequests.delete(src);
+      reject(new Error('Image unavailable'));
+    };
+    image.src = src;
+  });
+  portfolioImageRequests.set(src, request);
+  return request;
+}
+
+const chapterImageObserver = new IntersectionObserver((entries) => {
+  entries.forEach(({ target, isIntersecting }) => {
+    if (!isIntersecting || currentView !== 'work') return;
+    const chapter = target.id.slice(5);
+    projects.filter(project => project.category === chapter).forEach(project => {
+      loadPortfolioImage(portfolioQuickSrc(project.pages[0][0])).catch(() => {});
+    });
+  });
+}, { threshold: 0.1 });
+workPage.querySelectorAll('.work-entry').forEach(entry => chapterImageObserver.observe(entry));
 
 if (!reducedMotion.matches) {
   document.documentElement.classList.add('motion-ready');
@@ -222,7 +254,19 @@ function watchImage(img) {
   };
 }
 
-document.querySelectorAll('.project-preview img').forEach(watchImage);
+document.querySelectorAll('.project-preview img').forEach(img => {
+  watchImage(img);
+  const sharpen = () => {
+    const displayed = img.src;
+    if (!displayed.includes('/quick/')) return;
+    const sharp = displayed.replace('/quick/', '/screen/').replace('.jpg', '.webp');
+    loadPortfolioImage(sharp).then(image => {
+      if (img.isConnected && img.src === displayed) img.src = image.src;
+    }).catch(() => {});
+  };
+  img.addEventListener('load', sharpen);
+  if (img.complete && img.naturalWidth) sharpen();
+});
 
 function scrollToTarget(target) {
   if (target.matches('.work-entry')) {
@@ -439,7 +483,9 @@ window.addEventListener('scroll', () => {
   });
 }, { passive: true });
 
+let previewRotating = false;
 window.setInterval(async () => {
+  if (previewRotating) return;
   if (document.hidden || reducedMotion.matches || currentView !== 'work' || dialog.open || imageDialog.open) return;
   const entry = workPage.querySelector('.work-entry.is-current');
   if (!entry || entry.getBoundingClientRect().top >= window.innerHeight || entry.getBoundingClientRect().bottom <= 0) return;
@@ -451,10 +497,12 @@ window.setInterval(async () => {
   const img = index.querySelector('.project-preview img');
   const label = index.querySelector('.project-preview-caption');
   const project = projects.filter(item => item.category === id)[next];
-  const nextImage = new Image();
-  nextImage.src = portfolioPreviewSrc(pages[next]);
-  try { await nextImage.decode(); } catch { return; }
-  if (currentView !== 'work' || !entry.classList.contains('is-current') || index.matches(':hover, :focus-within')) return;
+  previewRotating = true;
+  let nextImage;
+  try { nextImage = await loadPortfolioImage(portfolioPreviewSrc(pages[next])); }
+  catch { return; }
+  finally { previewRotating = false; }
+  if (dialog.open || imageDialog.open || currentView !== 'work' || !entry.classList.contains('is-current') || index.matches(':hover, :focus-within')) return;
   const exit = img.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
   await exit.finished.catch(() => {});
   exit.cancel();
@@ -521,38 +569,38 @@ function prepareDetailImage(img, page) {
   status.setAttribute('role', 'status');
   img.after(status);
   let timer = 0;
-  let stage = 0;
-  const sources = [portfolioDetailSrc(page), portfolioQuickSrc(page)];
-  const load = () => {
+  let attempt = 0;
+  return async () => {
     if (!img.isConnected) return;
+    const currentAttempt = ++attempt;
+    const isCurrent = () => img.isConnected && currentAttempt === attempt;
     window.clearTimeout(timer);
     figure.classList.remove('image-unavailable');
     figure.classList.add('image-loading');
     status.textContent = '图片加载中…';
-    img.src = sources[stage];
-    timer = window.setTimeout(fallback, 8000);
-  };
-  const fallback = () => {
-    window.clearTimeout(timer);
-    if (!img.isConnected || (img.complete && img.naturalWidth)) return;
-    if (stage === 0) {
-      stage = 1;
-      load();
-    } else {
+    timer = window.setTimeout(() => {
+      if (isCurrent()) status.textContent = '网络较慢，正在加载…';
+    }, 6000);
+    try {
+      // Show the small JPEG immediately; never wait for a large image to time out.
+      const quick = await loadPortfolioImage(portfolioQuickSrc(page), 'high')
+        .catch(() => loadPortfolioImage(portfolioDetailSrc(page), 'high'));
+      if (!isCurrent()) return;
+      img.src = quick.src;
+      window.clearTimeout(timer);
+      figure.classList.remove('image-loading', 'image-unavailable');
+      status.textContent = '';
+      // Keep the visible image until the sharper replacement has fully arrived.
+      loadPortfolioImage(portfolioDetailSrc(page)).then(sharp => {
+        if (isCurrent()) img.src = sharp.src;
+      }).catch(() => {});
+    } catch {
+      if (!isCurrent()) return;
+      window.clearTimeout(timer);
       figure.classList.remove('image-loading');
       figure.classList.add('image-unavailable');
-      status.textContent = '加载较慢，点击重试';
+      status.textContent = '图片未加载，点击重试';
     }
-  };
-  img.addEventListener('load', () => {
-    window.clearTimeout(timer);
-    figure.classList.remove('image-loading', 'image-unavailable');
-    status.textContent = '';
-  });
-  img.addEventListener('error', fallback);
-  return () => {
-    stage = 0;
-    load();
   };
 }
 
@@ -610,10 +658,14 @@ function renderDetail(index, project = null) {
         retryImage();
         return;
       }
-      expandedImage.src = portfolioPageSrc(page);
+      const request = ++expandedImageRequest;
+      expandedImage.src = img.currentSrc || img.src;
       expandedImage.alt = caption;
       imageCaption.textContent = caption;
       imageDialog.showModal();
+      loadPortfolioImage(portfolioPageSrc(page), 'high').then(full => {
+        if (imageDialog.open && request === expandedImageRequest) expandedImage.src = full.src;
+      }).catch(() => {});
     });
     const figcaption = element('figcaption');
     figcaption.append(element('span', '', `${String(order + 1).padStart(2, '0')} / ${caption}`), element('span', '', `PDF ${String(page).padStart(2, '0')}`));
@@ -690,7 +742,10 @@ dialog.addEventListener('touchend', (event) => {
 }, { passive: true });
 
 document.querySelector('.image-close').addEventListener('click', () => imageDialog.close());
-imageDialog.addEventListener('close', () => expandedImage.removeAttribute('src'));
+imageDialog.addEventListener('close', () => {
+  expandedImageRequest += 1;
+  expandedImage.removeAttribute('src');
+});
 
 route();
 viewReady = true;
