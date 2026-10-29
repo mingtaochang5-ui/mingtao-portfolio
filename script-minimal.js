@@ -187,6 +187,39 @@ function element(tag, className, text) {
   return node;
 }
 
+function watchImage(img) {
+  let attempts = 0;
+  img.addEventListener('load', () => {
+    attempts = 0;
+    img.closest('.detail-figure')?.classList.remove('image-unavailable');
+  });
+  const retry = () => {
+    if (!img.isConnected) return;
+    if (attempts >= 2) {
+      img.closest('.detail-figure')?.classList.add('image-unavailable');
+      return;
+    }
+    attempts += 1;
+    window.setTimeout(() => {
+      if (!img.isConnected) return;
+      const url = new URL(img.src);
+      url.searchParams.set('retry', `${attempts}-${Date.now()}`);
+      img.src = url.href;
+    }, attempts * 450);
+  };
+  img.addEventListener('error', retry);
+  if (img.complete && !img.naturalWidth) retry();
+  return () => {
+    attempts = 0;
+    img.closest('.detail-figure')?.classList.remove('image-unavailable');
+    const url = new URL(img.src);
+    url.searchParams.set('retry', `manual-${Date.now()}`);
+    img.src = url.href;
+  };
+}
+
+document.querySelectorAll('.project-preview img').forEach(watchImage);
+
 function scrollToTarget(target) {
   if (target.matches('.work-entry')) {
     const entries = [...workPage.querySelectorAll('.work-entry')];
@@ -315,7 +348,7 @@ function route() {
     window.scrollTo({ top: 0, behavior: 'instant' });
     archiveHeading.style.removeProperty('--archive-exit');
   }
-  if (hash === '#portfolio' || hash.startsWith('#work-')) showView('work', coverRoute);
+  if (hash === '#portfolio' || hash.startsWith('#work-') || hash === '#thanks') showView('work', coverRoute);
   else if (!hash || hash === '#about' || hash === '#profile') showView('about', coverRoute);
 
   if (coverRoute) {
@@ -424,7 +457,7 @@ window.setInterval(async () => {
 
 function stepWorkPage(direction) {
   if (currentView !== 'work' || dialog.open || imageDialog.open || pageStepLocked) return;
-  const pages = [workPage.querySelector('.archive-heading'), ...document.querySelectorAll('.work-entry'), document.querySelector('.contact-section')].filter(Boolean);
+  const pages = [workPage.querySelector('.archive-heading'), ...document.querySelectorAll('.work-entry'), document.querySelector('.thanks-section'), document.querySelector('.contact-section')].filter(Boolean);
   const headerHeight = document.querySelector('.site-header').getBoundingClientRect().height;
   const entries = [...workPage.querySelectorAll('.work-entry')];
   const listTop = workPage.querySelector('.work-list').getBoundingClientRect().top + window.scrollY;
@@ -511,10 +544,14 @@ function renderDetail(index, project = null) {
     img.alt = caption;
     img.width = 2400;
     img.height = [28, 44, 55].includes(page) ? 500 : 1350;
-    img.loading = order === 0 ? 'eager' : 'lazy';
+    img.loading = order < 2 ? 'eager' : 'lazy';
     img.decoding = 'async';
-    button.append(img, element('span', 'image-zoom-hint', '放大 ↗'));
+    button.append(img, element('span', 'image-zoom-hint', '放大'));
     button.addEventListener('click', () => {
+      if (!img.naturalWidth) {
+        retryImage();
+        return;
+      }
       expandedImage.src = img.src;
       expandedImage.alt = caption;
       imageCaption.textContent = caption;
@@ -524,8 +561,10 @@ function renderDetail(index, project = null) {
     figcaption.append(element('span', '', `${String(order + 1).padStart(2, '0')} / ${caption}`), element('span', '', `PDF ${String(page).padStart(2, '0')}`));
     figure.append(button, figcaption);
     detailGallery.append(figure);
+    const retryImage = watchImage(img);
   });
-  document.querySelector('.detail-next-label').textContent = project ? '下一个项目' : '下一板块';
+  const isLastDetail = project ? project === projects.at(-1) : index === categories.length - 1;
+  document.querySelector('.detail-next-label').textContent = isLastDetail ? '感谢观看' : project ? '下一个项目' : '下一板块';
   document.querySelector('.detail-meta').scrollTop = 0;
   dialog.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -557,10 +596,15 @@ dialog.addEventListener('close', () => {
   document.body.classList.remove('detail-open');
 });
 document.querySelector('.detail-next').addEventListener('click', () => {
+  if (detailProject === projects.at(-1) || (!detailProject && detailCategory === categories.length - 1)) {
+    dialog.addEventListener('close', () => { window.location.hash = 'thanks'; }, { once: true });
+    closeDetail();
+    return;
+  }
   if (detailProject) {
-    const nextProject = projects[(projects.indexOf(detailProject) + 1) % projects.length];
+    const nextProject = projects[projects.indexOf(detailProject) + 1];
     renderDetail(categories.findIndex(category => category.id === nextProject.category), nextProject);
-  } else renderDetail((detailCategory + 1) % categories.length);
+  } else renderDetail(detailCategory + 1);
   document.querySelector('.detail-close').focus({ preventScroll: true });
 });
 let detailStepAt = 0;
