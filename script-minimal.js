@@ -343,12 +343,17 @@ function setCategory(id) {
 
 function route() {
   const hash = window.location.hash;
+  if (hash === '#thanks') {
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}#work-workflow`);
+    route();
+    return;
+  }
   const coverRoute = !hash || hash === '#about' || hash === '#portfolio' || hash === '#top';
   if (coverRoute) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     archiveHeading.style.removeProperty('--archive-exit');
   }
-  if (hash === '#portfolio' || hash.startsWith('#work-') || hash === '#thanks') showView('work', coverRoute);
+  if (hash === '#portfolio' || hash.startsWith('#work-')) showView('work', coverRoute);
   else if (!hash || hash === '#about' || hash === '#profile') showView('about', coverRoute);
 
   if (coverRoute) {
@@ -457,7 +462,7 @@ window.setInterval(async () => {
 
 function stepWorkPage(direction) {
   if (currentView !== 'work' || dialog.open || imageDialog.open || pageStepLocked) return;
-  const pages = [workPage.querySelector('.archive-heading'), ...document.querySelectorAll('.work-entry'), document.querySelector('.thanks-section'), document.querySelector('.contact-section')].filter(Boolean);
+  const pages = [workPage.querySelector('.archive-heading'), ...document.querySelectorAll('.work-entry'), document.querySelector('.contact-section')].filter(Boolean);
   const headerHeight = document.querySelector('.site-header').getBoundingClientRect().height;
   const entries = [...workPage.querySelectorAll('.work-entry')];
   const listTop = workPage.querySelector('.work-list').getBoundingClientRect().top + window.scrollY;
@@ -564,7 +569,7 @@ function renderDetail(index, project = null) {
     const retryImage = watchImage(img);
   });
   const isLastDetail = project ? project === projects.at(-1) : index === categories.length - 1;
-  document.querySelector('.detail-next-label').textContent = isLastDetail ? '感谢观看' : project ? '下一个项目' : '下一板块';
+  document.querySelector('.detail-next-label').textContent = isLastDetail ? '返回设计流程封面' : project ? '下一个项目' : '下一板块';
   document.querySelector('.detail-meta').scrollTop = 0;
   dialog.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -597,7 +602,7 @@ dialog.addEventListener('close', () => {
 });
 document.querySelector('.detail-next').addEventListener('click', () => {
   if (detailProject === projects.at(-1) || (!detailProject && detailCategory === categories.length - 1)) {
-    dialog.addEventListener('close', () => { window.location.hash = 'thanks'; }, { once: true });
+    dialog.addEventListener('close', () => { window.location.hash = 'work-workflow'; }, { once: true });
     closeDetail();
     return;
   }
@@ -615,6 +620,18 @@ dialog.addEventListener('wheel', (event) => {
   detailStepAt = Date.now();
   document.querySelector('.detail-next').click();
 }, { passive: false });
+
+let detailTouchStartY = 0;
+dialog.addEventListener('touchstart', (event) => {
+  detailTouchStartY = event.touches[0]?.clientY ?? 0;
+}, { passive: true });
+dialog.addEventListener('touchend', (event) => {
+  const lastDetail = detailProject === projects.at(-1) || (!detailProject && detailCategory === categories.length - 1);
+  if (!lastDetail || event.target.closest('.detail-meta') || !dialog.open || detailClosing || imageDialog.open) return;
+  const distance = detailTouchStartY - (event.changedTouches[0]?.clientY ?? detailTouchStartY);
+  if (distance <= 48 || dialog.scrollTop + dialog.clientHeight < dialog.scrollHeight - 12) return;
+  document.querySelector('.detail-next').click();
+}, { passive: true });
 
 document.querySelector('.image-close').addEventListener('click', () => imageDialog.close());
 imageDialog.addEventListener('close', () => expandedImage.removeAttribute('src'));
