@@ -1,4 +1,4 @@
-@import url('./portfolio-font.css');
+@import url('./portfolio-font.css?v=20261029-local');
 
 /* Local display face stays optional; Chinese text uses Alibaba's hosted web font. */
 @font-face {
