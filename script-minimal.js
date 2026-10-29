@@ -159,9 +159,9 @@ const previewPages = {
   visual: [45, 48, 50], workflow: [56, 59, 61],
 };
 const portfolioPageSrc = (page) => `./assets/portfolio/hd/page-${String(page).padStart(2, '0')}${page === 61 ? '-revised' : ''}.jpg`;
-const portfolioPreviewSrc = (page) => portfolioQuickSrc(page);
-const portfolioDetailSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/screen/').replace('.jpg', '.webp');
-const portfolioQuickSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/quick/');
+const portfolioPreviewSrc = (page) => portfolioPageSrc(page).replace('/hd/', '/screen/').replace('.jpg', '.webp');
+const portfolioDetailSrc = (page, width = window.innerWidth - (window.innerWidth <= 700 ? 28 : 100)) =>
+  width * Math.min(window.devicePixelRatio || 1, 2) > 1600 ? portfolioPageSrc(page) : portfolioPreviewSrc(page);
 let detailImageObserver;
 let expandedImageRequest = 0;
 const previewPositions = new Map();
@@ -190,9 +190,13 @@ const chapterImageObserver = new IntersectionObserver((entries) => {
   entries.forEach(({ target, isIntersecting }) => {
     if (!isIntersecting || currentView !== 'work') return;
     const chapter = target.id.slice(5);
-    projects.filter(project => project.category === chapter).forEach(project => {
-      loadPortfolioImage(portfolioQuickSrc(project.pages[0][0])).catch(() => {});
-    });
+    // Warm one chapter's first pages sequentially so they do not compete in parallel.
+    (async () => {
+      for (const project of projects.filter(project => project.category === chapter)) {
+        if (document.hidden || dialog.open || !target.classList.contains('is-current')) break;
+        await loadPortfolioImage(portfolioDetailSrc(project.pages[0][0])).catch(() => {});
+      }
+    })();
   });
 }, { threshold: 0.1 });
 workPage.querySelectorAll('.work-entry').forEach(entry => chapterImageObserver.observe(entry));
@@ -254,19 +258,7 @@ function watchImage(img) {
   };
 }
 
-document.querySelectorAll('.project-preview img').forEach(img => {
-  watchImage(img);
-  const sharpen = () => {
-    const displayed = img.src;
-    if (!displayed.includes('/quick/')) return;
-    const sharp = displayed.replace('/quick/', '/screen/').replace('.jpg', '.webp');
-    loadPortfolioImage(sharp).then(image => {
-      if (img.isConnected && img.src === displayed) img.src = image.src;
-    }).catch(() => {});
-  };
-  img.addEventListener('load', sharpen);
-  if (img.complete && img.naturalWidth) sharpen();
-});
+document.querySelectorAll('.project-preview img').forEach(watchImage);
 
 function scrollToTarget(target) {
   if (target.matches('.work-entry')) {
@@ -582,18 +574,16 @@ function prepareDetailImage(img, page) {
       if (isCurrent()) status.textContent = '网络较慢，正在加载…';
     }, 6000);
     try {
-      // Show the small JPEG immediately; never wait for a large image to time out.
-      const quick = await loadPortfolioImage(portfolioQuickSrc(page), 'high')
-        .catch(() => loadPortfolioImage(portfolioDetailSrc(page), 'high'));
+      // Match the displayed size without stretching a low-resolution placeholder.
+      const source = portfolioDetailSrc(page, img.getBoundingClientRect().width || undefined);
+      const fallback = source === portfolioPageSrc(page) ? portfolioPreviewSrc(page) : portfolioPageSrc(page);
+      const image = await loadPortfolioImage(source, 'high')
+        .catch(() => loadPortfolioImage(fallback, 'high'));
       if (!isCurrent()) return;
-      img.src = quick.src;
+      img.src = image.src;
       window.clearTimeout(timer);
       figure.classList.remove('image-loading', 'image-unavailable');
       status.textContent = '';
-      // Keep the visible image until the sharper replacement has fully arrived.
-      loadPortfolioImage(portfolioDetailSrc(page)).then(sharp => {
-        if (isCurrent()) img.src = sharp.src;
-      }).catch(() => {});
     } catch {
       if (!isCurrent()) return;
       window.clearTimeout(timer);
